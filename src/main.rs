@@ -1,47 +1,50 @@
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::{pubkey::Pubkey, signature::Keypair, signer::Signer};
-use std::str::FromStr;
+
 use anyhow::Result;
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::transaction::Transaction;
+use solana_sdk::{pubkey::Pubkey,signature::Keypair,signer::Signer};
+use solana_sdk::signature::read_keypair_file;
+use solana_sdk::system_instruction;
+use std::str::FromStr;
 
 
-fn main() -> Result<()> {
-    // 1. Connect to devnet
+
+fn main()->anyhow::Result<()>{
     let rpc_url = "https://api.devnet.solana.com";
     let client = RpcClient::new(rpc_url.to_string());
-    let pubkey = Pubkey::from_str("6WYtJeEVcXhMH3pumbZ82Me8NyNAnpXmSydajzeGvwun").unwrap();
 
-    match client.get_balance(&pubkey){
-        Ok(balance)=>{
-            let Sol = balance as f64/1_000_000_000.0;
-            println!("Solana Balance: {}",Sol);
-            println!("Lamports Balance: {}",balance);
-        },
-        Err(msg)=>println!("{}",msg),
-    }
-    
-    // 2. Generate keypairs (you and receiver)
+    let sender = read_keypair_file("id.json").expect("Failed to read Keypair");
+    let sender_pubkey = sender.pubkey();
+    let sender_secret = sender.secret();
 
     let receiver = Keypair::new();
-    println!("Receiver public key : {}",receiver.pubkey());
+    let receiver_pubkey = receiver.pubkey();
 
-    let receiver_pubkey = Pubkey::from_str("Fizs5pjY6Uf5PgsjTUuHPi2t1UT6a9PLmCjqz3jSbsvZ").unwrap();
+    let sender_balance = client.get_balance(&sender_pubkey)?;
+   
+    let receiver_balance = client.get_balance(&receiver_pubkey)?;
+    let blockhash = client.get_latest_blockhash()?;
+    
+    let transfer_instruction = system_instruction::transfer(
+        &sender_pubkey, 
+        &receiver_pubkey, 
+        900_300_234,
+    );
 
-    match client.get_balance(&receiver_pubkey){
-        Ok(balance)=>{
-            let Sol = balance as f64/1_000_000_000.0;
-            println!("Sol receiver balance: {}",Sol);
-        },
-        Err(msg)=>println!("{}",msg),
-    }    
-    // 3. Airdrop SOL to your account
-    
-    // 4. Check balance
-    
-    // 5. Create transfer instruction
-    
-    // 6. Send transaction
-    
-    // 7. Confirm and print balances
-    
+    let transaction = Transaction::new_signed_with_payer(
+        &[transfer_instruction], 
+        Some(&sender_pubkey), 
+        &[&sender], 
+        blockhash,
+    );
+
+    let signature = client.send_and_confirm_transaction(&transaction)?;
+    println!("Transaction Signature : {}",signature);
+    let sender_balance = client.get_balance(&sender_pubkey)?;
+    let receiver_balance = client.get_balance(&receiver_pubkey)?;
+    println!("Updated Sender balance: {}, Updated receiver balance: {}",sender_balance as f64 / 1_000_000_000.0,receiver_balance as f64 / 1_000_000_000.0);
+
+
     Ok(())
+
 }
