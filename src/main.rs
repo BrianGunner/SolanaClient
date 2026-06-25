@@ -58,6 +58,14 @@ fn main()->Result<()>{
         std::result::Result::Ok(sig)=>println!("Solomon Token Mint created with signature: {}",sig),
         Err(msg)=>println!("{}",msg),
     }
+    println!("Solomon Token Pubkey: {}",solomon_pubkey);
+    let solomon_info = client.get_account(&solomon_pubkey)?;
+    
+    println!("Solomon Owner: {}",solomon_info.owner);
+    println!("Solomon lamports: {}",solomon_info.lamports);
+    println!("Solomon Executable: {}",solomon_info.executable);
+    println!("Solomon Data Length {}",solomon_info.data.len());
+
 
     
     Ok(())
