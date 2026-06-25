@@ -23,53 +23,40 @@ fn main()->Result<()>{
 
     let main_account = read_keypair_file("id.json").map_err(|e|anyhow::anyhow!("Could not load keypair: {}",e))?;
     let main_pubkey = main_account.pubkey();
+    println!("Main Account Pubkey: {}",main_pubkey);
 
     let solomon_token = read_keypair_file("solomon-mint.json").map_err(|e|anyhow::anyhow!("Could not load keypair: {}",e))?;
     let solomon_pubkey = solomon_token.pubkey();
+    println!("Solomon Token Mint Account Pubkey: {}",solomon_pubkey);
 
     let token_account = read_keypair_file("token-account.json").map_err(|e|anyhow::anyhow!("could not load token-account: {}",e))?;
     let token_pubkey = token_account.pubkey();
-
-    let space = TokenAccount::LEN;
-    let space_lamports = client.get_minimum_balance_for_rent_exemption(space)?;
+    println!("Solomon Token Account Pubkey: {}",token_pubkey);
 
     let recent_blockhash = client.get_latest_blockhash()?;
-    
-    let token_account_instruction = system_instruction::create_account(
-        &main_pubkey, 
-        &token_pubkey, 
-        space_lamports, 
-        space as u64, 
-        &spl_token::ID,
-    );
 
-    let init_token_acc_instruction = spl_token::instruction::initialize_account(
+    let mint_to_instruction = spl_token::instruction::mint_to(
         &spl_token::ID, 
-        &token_pubkey, 
         &solomon_pubkey, 
-        &main_pubkey,
+        &token_pubkey, 
+        &main_pubkey, 
+        &[], 
+        1_000_000_000_000,
     )?;
 
-    let init_tx = Transaction::new_signed_with_payer(
-        &[token_account_instruction,init_token_acc_instruction], 
+    let mint_to_tx = Transaction::new_signed_with_payer(
+        &[mint_to_instruction], 
         Some(&main_pubkey), 
-        &[&main_account,&token_account],
-        recent_blockhash,
+        &[&main_account], 
+        recent_blockhash
     );
 
-    let signature = client.send_and_confirm_transaction(&init_tx);
+    let signature = client.send_and_confirm_transaction(&mint_to_tx);
 
     match signature{
-        std::result::Result::Ok(sig)=>println!("Solomon Token Mint created with signature: {}",sig),
+        std::result::Result::Ok(sig)=>println!("Solomon Tokens minted into token account with signature: {}",sig),
         Err(msg)=>println!("{}",msg),
     }
-
-    println!("Token Account Pubkey: {}",token_account.pubkey());
-    let token_account_info = client.get_account(&token_pubkey)?;
-    println!("Token Owner: {}",token_account_info.owner);
-    println!("Token lamports: {}",token_account_info.lamports);
-    println!("Token Executable: {}",token_account_info.executable);
-    println!("Token Data Length {}",token_account_info.data.len());
 
     
     Ok(())
