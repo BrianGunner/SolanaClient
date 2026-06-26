@@ -14,50 +14,49 @@ use spl_token::state::Mint;
 use std::fs;
 use solana_sdk::signature::write_keypair_file;
 
-
-
-
 fn main()->Result<()>{
     let rpc_url = "https://devnet.helius-rpc.com/?api-key=a6a3f92d-2503-4f4f-bb01-11a49e284aa5".to_string();
     let client = RpcClient::new(rpc_url);
 
-    let main_account = read_keypair_file("id.json").map_err(|e|anyhow::anyhow!("Could not load keypair: {}",e))?;
+    let main_account = read_keypair_file("main-account.json").map_err(|e|anyhow::anyhow!("Could not read keypair: {}",e))?;
     let main_pubkey = main_account.pubkey();
-    println!("Main Account Pubkey: {}",main_pubkey);
+    
+    let mint_account = read_keypair_file("drill-mint.json").map_err(|e|anyhow::anyhow!("Could not load keypair: {}",e))?;
+    let mint_pubkey = mint_account.pubkey();
 
-    let solomon_token = read_keypair_file("solomon-mint.json").map_err(|e|anyhow::anyhow!("Could not load keypair: {}",e))?;
-    let solomon_pubkey = solomon_token.pubkey();
-    println!("Solomon Token Mint Account Pubkey: {}",solomon_pubkey);
-
-    let token_account = read_keypair_file("token-account.json").map_err(|e|anyhow::anyhow!("could not load token-account: {}",e))?;
-    let token_pubkey = token_account.pubkey();
-    println!("Solomon Token Account Pubkey: {}",token_pubkey);
-
+    let space = Mint::LEN;
+    let lamports = client.get_minimum_balance_for_rent_exemption(space)?;
     let recent_blockhash = client.get_latest_blockhash()?;
 
-    let mint_to_instruction = spl_token::instruction::mint_to(
-        &spl_token::ID, 
-        &solomon_pubkey, 
-        &token_pubkey, 
+    let mint_ac_inst = system_instruction::create_account(
         &main_pubkey, 
-        &[], 
-        1_000_000_000_000,
-    )?;
+        &mint_pubkey, 
+        lamports, 
+        space as u64, 
+        &spl_token::ID
+    );
 
-    let mint_to_tx = Transaction::new_signed_with_payer(
-        &[mint_to_instruction], 
+    let mint_ac_tx = Transaction::new_signed_with_payer(
+        &[mint_ac_inst], 
         Some(&main_pubkey), 
-        &[&main_account], 
+        &[&main_account,&mint_account], 
         recent_blockhash
     );
 
-    let signature = client.send_and_confirm_transaction(&mint_to_tx);
+    let signature = client.send_and_confirm_transaction(&mint_ac_tx);
 
     match signature{
-        std::result::Result::Ok(sig)=>println!("Solomon Tokens minted into token account with signature: {}",sig),
+        std::result::Result::Ok(sig)=>println!("Mint account created: {}",sig),
         Err(msg)=>println!("{}",msg),
     }
 
+
     
+
     Ok(())
+
 }
+
+
+
+
