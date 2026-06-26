@@ -1,6 +1,7 @@
 use anyhow::{Context, Error, Ok, Result};
 use solana_client::pubsub_client::PubsubSignatureClientSubscription;
 use solana_client::rpc_client::RpcClient;
+use solana_sdk::account::ReadableAccount;
 use solana_sdk::instruction::Instruction;
 use solana_sdk::transaction::Transaction;
 use solana_sdk::{pubkey::Pubkey,signature::Keypair,signer::Signer};
@@ -24,34 +25,12 @@ fn main()->Result<()>{
     let mint_account = read_keypair_file("drill-mint.json").map_err(|e|anyhow::anyhow!("Could not load keypair: {}",e))?;
     let mint_pubkey = mint_account.pubkey();
 
-    let space = Mint::LEN;
-    let lamports = client.get_minimum_balance_for_rent_exemption(space)?;
-    let recent_blockhash = client.get_latest_blockhash()?;
+    let mint_info = client.get_account(&mint_pubkey)?;
+    let mint_data = Mint::unpack(&mint_info.data)?;
+    println!("Mint Data Is Initialized: {}",mint_data.is_initialized);
+    println!("Decimals: {}",mint_data.decimals);
+    println!("Total supply: {}",mint_data.supply);
 
-    let mint_ac_inst = system_instruction::create_account(
-        &main_pubkey, 
-        &mint_pubkey, 
-        lamports, 
-        space as u64, 
-        &spl_token::ID
-    );
-
-    let mint_ac_tx = Transaction::new_signed_with_payer(
-        &[mint_ac_inst], 
-        Some(&main_pubkey), 
-        &[&main_account,&mint_account], 
-        recent_blockhash
-    );
-
-    let signature = client.send_and_confirm_transaction(&mint_ac_tx);
-
-    match signature{
-        std::result::Result::Ok(sig)=>println!("Mint account created: {}",sig),
-        Err(msg)=>println!("{}",msg),
-    }
-
-
-    
 
     Ok(())
 
